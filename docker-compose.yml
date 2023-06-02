@@ -1,0 +1,101 @@
+version: "3.8"
+services:
+  # micro
+  micro:
+    build:
+      args:
+        user: melo
+        uid: 1000
+      context: ./
+      dockerfile: ./docker/Dockerfile
+    image: laravel-app
+    restart: unless-stopped
+    working_dir: /var/www/
+    volumes:
+      - ./:/var/www
+    depends_on:
+      - redis
+    networks:
+      - microqrmenu
+
+  # nginx
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - '${APP_PORT:-8080}:8080'
+    volumes:
+        - .:/var/www
+        - ./docker/nginx/:/etc/nginx/conf.d/
+    networks:
+      - microqrmenu
+
+  # mysql
+  mysql:
+    image: mysql:latest
+    restart: unless-stopped
+    ports:
+      - '${FORWARD_DB_PORT:-3387}:3306'
+    environment:
+      MYSQL_DATABASE: '${DB_DATABASE}'
+      MYSQL_ROOT_PASSWORD: '${DB_PASSWORD}'
+      MYSQL_PASSWORD: '${DB_PASSWORD}'
+      MYSQL_USER: '${DB_USERNAME}'
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+    volumes:
+      - ./docker/data/mysql:/var/lib/mysql
+    networks:
+      - microqrmenu
+
+  #phpMyadmin
+  phpMyadmin:
+    image: phpmyadmin/phpmyadmin
+    restart: unless-stopped
+    ports:
+      - ${FORWARD_PHPMYADMIN_PORT:-91}:80
+    environment:
+      PMA_HOST: mysql
+      PMA_USER: '${DB_USERNAME}'
+      PMA_PASSWORD: '${DB_PASSWORD}'
+      UPLOAD_LIMIT: 300M
+    depends_on:
+      - mysql
+    networks:
+      - microqrmenu
+
+  #MailHog
+  mailhog:
+    image: 'mailhog/mailhog:latest'
+    restart: unless-stopped
+    ports:
+      - '${FORWARD_MAILHOG_PORT:-1095}:1025'
+      - '${FORWARD_MAILHOG_DASHBOARD_PORT:-8095}:8025'
+    networks:
+      - microqrmenu
+
+  #redis
+  redis:
+    image: redis:latest
+    restart: unless-stopped
+    ports:
+        - '${FORWARD_REDIS_PORT:-6399}:6379'
+    volumes:
+        - './docker/data/redis:/data'
+    networks:
+        - microqrmenu
+
+
+  #memcached
+  memcached:
+    image: 'memcached:alpine'
+    ports:
+      - '${FORWARD_MEMCACHED_PORT:-11291}:11211'
+    networks:
+      - microqrmenu
+
+
+
+
+networks:
+  microqrmenu:
+    driver: bridge
